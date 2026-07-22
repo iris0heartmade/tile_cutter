@@ -92,9 +92,15 @@ class ProjectModel:
         else:
             raise ValueError(f'Unknown anchor: {anchor}')
 
-        # Clamp to keep old image fully inside new image
-        x = max(0, min(x, new_rect.width() - old_rect.width()))
-        y = max(0, min(y, new_rect.height() - old_rect.height()))
+        # Clamp so the anchored edge is preserved for both grow and shrink.
+        # Valid offset range is between min(0, delta) and max(0, delta) where
+        # delta = new - old. Growing -> [0, delta]; shrinking -> [delta, 0]
+        # (delta < 0), letting right/bottom anchors keep their edge visible
+        # instead of collapsing to (0, 0).
+        dx = new_rect.width() - old_rect.width()
+        dy = new_rect.height() - old_rect.height()
+        x = max(min(0, dx), min(x, max(0, dx)))
+        y = max(min(0, dy), min(y, max(0, dy)))
 
         painter = QPainter(new_image)
         painter.drawImage(x, y, self.image)
