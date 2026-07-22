@@ -116,3 +116,14 @@ class ProjectModel:
         self.image = new_image
         self.cols = new_cols
         self.rows = new_rows
+
+        # Selection lives in image-space pixel coords. Drop any selected
+        # pixels that fell outside the new canvas (e.g. after a shrink) so
+        # downstream renderers and commands never have to defend against
+        # out-of-bounds coordinates.
+        new_w = new_image.width()
+        new_h = new_image.height()
+        self.selection = {
+            (x, y) for (x, y) in self.selection
+            if 0 <= x < new_w and 0 <= y < new_h
+        }

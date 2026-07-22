@@ -95,3 +95,45 @@ def test_project_model_resize_canvas_top_right_preserves_edge():
     # Right edge preserved: old pixel (old_w-1, 0) now sits at (new_w-1, 0).
     assert project.image.pixelColor(new_w - 1, 0).getRgb() == (255, 0, 0, 255)
 
+
+def test_project_model_resize_clamps_selection_to_new_bounds():
+    # Set up a 3x3 project (3*16 = 48 wide) with selected pixels that span
+    # the right and bottom edges. Shrink by 1 column / 1 row so the new
+    # canvas is 2x2 (32 wide, valid coords 0..31). The three pixels that
+    # fell outside must be dropped; the rest must stay selected.
+    project = ProjectModel(tile_width=16, tile_height=16, cols=3, rows=3)
+
+    project.selection = {
+        (0, 0),           # stays (top-left corner)
+        (16, 16),         # stays (col 1, row 1)
+        (31, 31),         # stays (last valid pixel of new canvas)
+        (32, 0),          # dropped (was start of column 2, now outside)
+        (47, 47),         # dropped (bottom-right corner of old canvas)
+        (0, 48),          # dropped (just past bottom edge)
+    }
+
+    project.resize_canvas(delta_cols=-1, delta_rows=-1, anchor='top-left')
+    assert project.cols == 2
+    assert project.rows == 2
+    assert project.width == 32
+    assert project.height == 32
+    assert (0, 0) in project.selection
+    assert (16, 16) in project.selection
+    assert (31, 31) in project.selection
+    assert (32, 0) not in project.selection
+    assert (47, 47) not in project.selection
+    assert (0, 48) not in project.selection
+    # Sanity: selection only contains pixels inside the new canvas.
+    for x, y in project.selection:
+        assert 0 <= x < project.width
+        assert 0 <= y < project.height
+
+
+def test_project_model_resize_grow_keeps_selection():
+    # Growing must not drop any selected pixels.
+    project = ProjectModel(tile_width=16, tile_height=16, cols=2, rows=2)
+    project.selection = {(0, 0), (15, 15), (16, 16)}
+    before = set(project.selection)
+    project.resize_canvas(delta_cols=1, delta_rows=1, anchor='top-left')
+    assert project.selection == before
+
