@@ -1,10 +1,12 @@
 import sys
 from editor.app import create_application
+from editor.main_window import MainWindow
 
 
 def main():
     app = create_application(sys.argv)
-    # MainWindow will be added in a later task
+    window = MainWindow()
+    window.show()
     return app.exec_()
 
 

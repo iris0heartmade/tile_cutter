@@ -1,4 +1,4 @@
-from PyQt5.QtCore import Qt, QPoint, QSize
+from PyQt5.QtCore import Qt, QPoint, QSize, pyqtSignal
 from PyQt5.QtGui import QPainter, QColor, QPen, QPixmap, QMouseEvent, QImage
 from PyQt5.QtWidgets import QWidget
 from editor.models.project_model import ProjectModel
@@ -8,6 +8,10 @@ from editor.tools.base_tool import Tool
 
 
 class CanvasWidget(QWidget):
+    # Emits (col, row) of the tile under the cursor, or (-1, -1) when the
+    # cursor is not over a tile (gutter, offset margin, outside canvas).
+    mouse_moved = pyqtSignal(int, int)
+
     def __init__(self, project: ProjectModel, command_stack: CommandStack, parent=None):
         super().__init__(parent)
         self.project = project
@@ -133,6 +137,11 @@ class CanvasWidget(QWidget):
             super().mousePressEvent(event)
 
     def mouseMoveEvent(self, event: QMouseEvent):
+        tile = self.screen_to_grid(event.pos().x(), event.pos().y())
+        if tile is not None:
+            self.mouse_moved.emit(tile[0], tile[1])
+        else:
+            self.mouse_moved.emit(-1, -1)
         if self._paste_image is not None:
             img_x = int(event.pos().x() / self._zoom)
             img_y = int(event.pos().y() / self._zoom)
