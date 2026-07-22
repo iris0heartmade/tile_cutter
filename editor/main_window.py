@@ -38,6 +38,10 @@ class MainWindow(QMainWindow):
         self.project = ProjectModel(16, 16, 8, 8)
         self.command_stack = CommandStack()
 
+        # Set True whenever an undoable change is made; drives the
+        # close-with-unsaved-changes confirmation (spec §12).
+        self.dirty = False
+
         self.tools = {
             'Brush': BrushTool(),
             'Eraser': EraserTool(),
@@ -173,6 +177,11 @@ class MainWindow(QMainWindow):
         self.canvas.mouse_moved.connect(self._on_canvas_mouse_moved)
         self.command_stack.can_undo_changed.connect(self.undo_action.setEnabled)
         self.command_stack.can_redo_changed.connect(self.redo_action.setEnabled)
+        self.command_stack.can_undo_changed.connect(self._mark_dirty)
+
+    def _mark_dirty(self, *args):
+        """Any mutation of the command stack marks the project unsaved."""
+        self.dirty = True
 
     # --- Tool / zoom --------------------------------------------------------
 
@@ -236,10 +245,13 @@ class MainWindow(QMainWindow):
         self.canvas.command_stack = self.command_stack
         self.command_stack.can_undo_changed.connect(self.undo_action.setEnabled)
         self.command_stack.can_redo_changed.connect(self.redo_action.setEnabled)
+        self.command_stack.can_undo_changed.connect(self._mark_dirty)
         self.undo_action.setEnabled(False)
         self.redo_action.setEnabled(False)
         self._sync_size_spinboxes()
         self._refresh_canvas()
+        # A brand-new project starts clean.
+        self.dirty = False
 
     def _on_open_source(self):
         paths, _ = QFileDialog.getOpenFileNames(
@@ -255,6 +267,8 @@ class MainWindow(QMainWindow):
                 QMessageBox.warning(self, 'Open Source Failed', str(exc))
                 continue
             self.source_library.add_source(source)
+        # Loading a fresh source library is treated as a clean state.
+        self.dirty = False
 
     def _on_export(self):
         path_str, _ = QFileDialog.getSaveFileName(
@@ -280,9 +294,31 @@ class MainWindow(QMainWindow):
         except OSError as exc:
             QMessageBox.critical(self, 'Export Failed', str(exc))
             return
+        # A successful export persists the project -> no longer dirty.
+        self.dirty = False
         QMessageBox.information(
             self, 'Export Complete',
             f'Exported:\n{png_path}\n{tres_path}')
+
+    # --- Close handling -----------------------------------------------------
+
+    def closeEvent(self, event):
+        """Confirm before discarding unsaved changes (spec §12)."""
+        if not self.dirty:
+            event.accept()
+            return
+        reply = QMessageBox.question(
+            self, 'Unsaved Changes',
+            'You have unsaved changes. Save before closing?',
+            QMessageBox.Yes | QMessageBox.No | QMessageBox.Cancel,
+            QMessageBox.Yes)
+        if reply == QMessageBox.Yes:
+            self._on_export()
+            event.accept()
+        elif reply == QMessageBox.No:
+            event.accept()
+        else:
+            event.ignore()
 
     # --- Edit actions -------------------------------------------------------
 

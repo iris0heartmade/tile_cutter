@@ -2,9 +2,20 @@ import os
 os.environ.setdefault('QT_QPA_PLATFORM', 'offscreen')
 
 import pytest
-from PyQt5.QtWidgets import QApplication
+from PyQt5.QtWidgets import QApplication, QMessageBox
 from editor.app import create_application
 from editor.main_window import MainWindow
+
+
+class _FakeCloseEvent:
+    def __init__(self):
+        self.accepted = None
+
+    def accept(self):
+        self.accepted = True
+
+    def ignore(self):
+        self.accepted = False
 
 
 @pytest.fixture(scope='session')
@@ -105,3 +116,90 @@ def test_export_uses_default_when_prompt_cancelled(app, tmp_path, monkeypatch):
 
     window._on_export()
     assert captured['tex'] == 'res://tileset.png'
+
+
+def _push_dummy_command(window):
+    """Push a real ResizeCanvasCommand so the stack fires can_undo_changed."""
+    window.cols_spin.setValue(window.project.cols + 1)
+
+
+def test_new_window_is_clean(app):
+    window = MainWindow()
+    assert window.dirty is False
+
+
+def test_command_push_marks_dirty(app):
+    window = MainWindow()
+    assert window.dirty is False
+    _push_dummy_command(window)
+    assert window.dirty is True
+
+
+def test_new_project_resets_dirty(app):
+    window = MainWindow()
+    _push_dummy_command(window)
+    assert window.dirty is True
+    window._on_new()
+    assert window.dirty is False
+
+
+def test_close_when_clean_accepts(app):
+    window = MainWindow()
+    event = _FakeCloseEvent()
+    window.closeEvent(event)
+    assert event.accepted is True
+
+
+def test_close_dirty_discard_accepts(app, monkeypatch):
+    window = MainWindow()
+    _push_dummy_command(window)
+    monkeypatch.setattr(QMessageBox, 'question',
+                        staticmethod(lambda *a, **k: QMessageBox.No))
+    event = _FakeCloseEvent()
+    window.closeEvent(event)
+    assert event.accepted is True
+
+
+def test_close_dirty_cancel_ignores(app, monkeypatch):
+    window = MainWindow()
+    _push_dummy_command(window)
+    monkeypatch.setattr(QMessageBox, 'question',
+                        staticmethod(lambda *a, **k: QMessageBox.Cancel))
+    event = _FakeCloseEvent()
+    window.closeEvent(event)
+    assert event.accepted is False
+
+
+def test_close_dirty_save_exports_and_accepts(app, monkeypatch):
+    window = MainWindow()
+    _push_dummy_command(window)
+    monkeypatch.setattr(QMessageBox, 'question',
+                        staticmethod(lambda *a, **k: QMessageBox.Yes))
+    called = []
+    window._on_export = lambda: called.append('export')
+    event = _FakeCloseEvent()
+    window.closeEvent(event)
+    assert called == ['export']
+    assert event.accepted is True
+
+
+def test_export_clears_dirty(app, tmp_path, monkeypatch):
+    import editor.main_window as mw
+    window = MainWindow()
+    _push_dummy_command(window)
+    assert window.dirty is True
+
+    png_path = tmp_path / 'tileset.png'
+    monkeypatch.setattr(
+        mw.QFileDialog, 'getSaveFileName',
+        staticmethod(lambda *a, **k: (str(png_path), 'PNG Images (*.png)')))
+    monkeypatch.setattr(
+        mw.QInputDialog, 'getText',
+        staticmethod(lambda *a, **k: ('res://tileset.png', True)))
+    monkeypatch.setattr(mw.QMessageBox, 'information',
+                        staticmethod(lambda *a, **k: None))
+    monkeypatch.setattr(mw.GodotExporter, 'export',
+                        staticmethod(lambda *a, **k: None))
+
+    window._on_export()
+    assert window.dirty is False
