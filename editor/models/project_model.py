@@ -17,9 +17,16 @@ class ProjectModel:
         self.cols = int(cols)
         self.rows = int(rows)
         self.sources: List = []
-        self.selection = None
+        self.selection = set()
         self.active_tool = None
         self._recreate_image()
+
+    def set_selection(self, pixels):
+        """Replace the current selection with a fresh copy of `pixels`."""
+        self.selection = set(pixels)
+
+    def clear_selection(self):
+        self.selection = set()
 
     def _calculate_size(self, cols: int, rows: int) -> Tuple[int, int]:
         w = self.offset_x + cols * self.tile_width
