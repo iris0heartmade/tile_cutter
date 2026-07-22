@@ -5,7 +5,7 @@ from PyQt5.QtGui import QKeySequence
 from PyQt5.QtWidgets import (
     QMainWindow, QWidget, QVBoxLayout, QSplitter, QScrollArea,
     QToolBar, QAction, QActionGroup, QSpinBox, QLabel,
-    QFileDialog, QMessageBox,
+    QFileDialog, QMessageBox, QInputDialog,
 )
 
 from editor.models.project_model import ProjectModel
@@ -265,9 +265,18 @@ class MainWindow(QMainWindow):
         if png_path.suffix.lower() != '.png':
             png_path = png_path.with_suffix('.png')
         tres_path = png_path.with_suffix('.tres')
+
+        # Godot resource path is user-configurable; default to the PNG name at
+        # the project root. Cancelling the prompt keeps the default.
+        default_res = f'res://{png_path.name}'
+        res_path, accepted = QInputDialog.getText(
+            self, 'Godot Resource Path',
+            'Texture path inside the Godot project:', text=default_res)
+        godot_texture_path = res_path if (accepted and res_path) else default_res
+
         try:
             GodotExporter.export(self.project, png_path, tres_path,
-                                 f'res://{png_path.name}')
+                                 godot_texture_path)
         except OSError as exc:
             QMessageBox.critical(self, 'Export Failed', str(exc))
             return

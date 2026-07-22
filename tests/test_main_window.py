@@ -52,3 +52,56 @@ def test_set_tool_updates_canvas_and_options(app):
     window._set_tool(tool, 'Eraser')
     assert window.canvas._tool is tool
     assert 'Eraser' in window.options_bar.tool_label.text()
+
+
+def test_export_prompts_for_godot_path(app, tmp_path, monkeypatch):
+    """The Godot resource path is user-configurable: _on_export asks for it
+    and passes whatever the user enters to the exporter."""
+    import editor.main_window as mw
+
+    window = MainWindow()
+    png_path = tmp_path / 'tileset.png'
+
+    monkeypatch.setattr(
+        mw.QFileDialog, 'getSaveFileName',
+        staticmethod(lambda *a, **k: (str(png_path), 'PNG Images (*.png)')))
+    # User types a custom resource path in the input dialog (accepted = True).
+    monkeypatch.setattr(
+        mw.QInputDialog, 'getText',
+        staticmethod(lambda *a, **k: ('res://tilesets/custom.png', True)))
+    monkeypatch.setattr(mw.QMessageBox, 'information',
+                        staticmethod(lambda *a, **k: None))
+
+    captured = {}
+    monkeypatch.setattr(
+        mw.GodotExporter, 'export',
+        staticmethod(lambda project, p, t, tex: captured.update(tex=tex)))
+
+    window._on_export()
+    assert captured['tex'] == 'res://tilesets/custom.png'
+
+
+def test_export_uses_default_when_prompt_cancelled(app, tmp_path, monkeypatch):
+    """If the user cancels the input dialog, the default res:// path is used."""
+    import editor.main_window as mw
+
+    window = MainWindow()
+    png_path = tmp_path / 'tileset.png'
+
+    monkeypatch.setattr(
+        mw.QFileDialog, 'getSaveFileName',
+        staticmethod(lambda *a, **k: (str(png_path), 'PNG Images (*.png)')))
+    # Cancelled -> accepted flag False.
+    monkeypatch.setattr(
+        mw.QInputDialog, 'getText',
+        staticmethod(lambda *a, **k: ('ignored', False)))
+    monkeypatch.setattr(mw.QMessageBox, 'information',
+                        staticmethod(lambda *a, **k: None))
+
+    captured = {}
+    monkeypatch.setattr(
+        mw.GodotExporter, 'export',
+        staticmethod(lambda project, p, t, tex: captured.update(tex=tex)))
+
+    window._on_export()
+    assert captured['tex'] == 'res://tileset.png'
