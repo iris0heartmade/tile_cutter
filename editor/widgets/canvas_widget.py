@@ -84,6 +84,7 @@ class CanvasWidget(QWidget):
         painter.drawPixmap(0, 0, QPixmap.fromImage(scaled))
 
         self._draw_grid(painter)
+        self._draw_selection(painter)
         self._draw_paste_preview(painter)
         painter.end()
 
@@ -99,6 +100,22 @@ class CanvasWidget(QWidget):
         for row in range(self.project.rows + 1):
             y = int((self.project.offset_y + row * (self.project.tile_height + self.project.gutter_y)) * self._zoom)
             painter.drawLine(0, y, int(self.project.width * self._zoom), y)
+
+    def _draw_selection(self, painter: QPainter):
+        if not self.project.selection:
+            return
+        # Selection lives in image-space pixel coordinates. Each selected
+        # pixel is highlighted with a semi-transparent blue fill and a
+        # more opaque blue outline. We draw one 1x1 (image-space) rect per
+        # pixel scaled by `_zoom` so the highlight tracks the canvas grid
+        # at any zoom level.
+        painter.setPen(QPen(QColor(0, 150, 255, 200)))
+        painter.setBrush(QColor(0, 150, 255, 40))
+        z = self._zoom
+        for x, y in self.project.selection:
+            sx = int(x * z)
+            sy = int(y * z)
+            painter.drawRect(sx, sy, max(1, int(z)), max(1, int(z)))
 
     def _draw_paste_preview(self, painter: QPainter):
         if self._paste_image is None or self._paste_pos is None:
