@@ -245,7 +245,6 @@ class MainWindow(QMainWindow):
         self.canvas.update()
 
     def _on_tile_size_changed(self, tile_w: int, tile_h: int):
-        self.project.set_tile_size(tile_w, tile_h)
         self._refresh_canvas()
 
     # --- Undo / redo --------------------------------------------------------

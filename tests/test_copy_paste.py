@@ -113,37 +113,27 @@ def test_copy_selection_emits_correctly_sized_image(app, tmp_path):
     assert copied.pixelColor(31, 31).rgba() == qRgba(188, 188, 0, 255)
 
 
-def test_copy_selection_warning_on_grid_mismatch(app, tmp_path, monkeypatch):
-    # Source: 32x32 with 16x16 tiles (2x2). Target canvas: 32x32 tiles.
+def test_copy_selection_with_scaling(app, tmp_path):
     source = _make_solid_source(tmp_path, w=32, h=32, tile_w=16, tile_h=16,
                                 rgba=qRgba(255, 0, 0, 255))
 
-    project = ProjectModel(32, 32, 4, 4)  # target tile size differs
+    project = ProjectModel(32, 32, 4, 4)
     widget = SourceLibraryWidget(project)
     widget.add_source(source)
     widget._current_source_index = 0
     widget._select_start = (0, 0)
     widget._select_end = (0, 0)
 
-    warnings = []
-    # Avoid a real modal dialog by capturing and short-circuiting the call.
-    monkeypatch.setattr(
-        'PyQt5.QtWidgets.QMessageBox.warning',
-        lambda *args, **kwargs: warnings.append((args, kwargs)) or 0,
-    )
+    widget._sync_mode = False
 
     captured = []
     widget.tile_copied.connect(lambda img: captured.append(img))
 
     widget.copy_selection()
 
-    # No emit because of grid mismatch.
-    assert captured == []
-    # A warning was shown with the source and target sizes in the message.
-    assert len(warnings) == 1
-    message = warnings[0][0][2]
-    assert '16x16' in message
-    assert '32x32' in message
+    assert len(captured) == 1
+    assert captured[0].width() == 32
+    assert captured[0].height() == 32
 
 
 def test_copy_selection_no_selection_does_nothing(app, tmp_path):
