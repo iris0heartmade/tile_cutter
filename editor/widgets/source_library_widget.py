@@ -232,8 +232,6 @@ class SourceLibraryWidget(QWidget):
             painter.end()
             pixmap = overlay
 
-        pixmap = self._draw_grid_on_pixmap(pixmap, source)
-
         viewport = self.preview_scroll.viewport()
         view_w = viewport.width()
         view_h = viewport.height()
@@ -244,19 +242,15 @@ class SourceLibraryWidget(QWidget):
 
         painter = QPainter(final_pixmap)
         painter.drawPixmap(int(self._pan_x), int(self._pan_y), pixmap)
+
+        self._draw_grid_on_painter(painter, source, draw_w, draw_h)
         painter.end()
 
         self.preview_label.setFixedSize(display_w, display_h)
         self.preview_label.setPixmap(final_pixmap)
 
-    def _draw_grid_on_pixmap(self, pixmap: QPixmap, source: SourceImage) -> QPixmap:
-        """Draw tile grid lines on top of the given pixmap.
-
-        Returns a new pixmap with grid overlay so the original is not
-        modified in-place.
-        """
-        overlay = QPixmap(pixmap)
-        painter = QPainter(overlay)
+    def _draw_grid_on_painter(self, painter: QPainter, source: SourceImage, draw_w: int, draw_h: int):
+        """Draw tile grid lines on top of the painter. Grid is fixed, image pans underneath."""
         pen = QPen(QColor(100, 200, 255, 120))
         pen.setWidth(max(1, int(self._zoom)))
         painter.setPen(pen)
@@ -266,23 +260,16 @@ class SourceLibraryWidget(QWidget):
         off_y = source.offset_y * z
         pitch_w = (source.tile_width + source.gutter_x) * z
         pitch_h = (source.tile_height + source.gutter_y) * z
-        draw_w = pixmap.width()
-        draw_h = pixmap.height()
 
-        # Vertical lines (tile boundaries, not gutter boundaries).
         for col in range(source.cols + 1):
             x = int(off_x + col * pitch_w)
             if 0 <= x <= draw_w:
                 painter.drawLine(x, int(off_y), x, int(min(draw_h, off_y + source.rows * pitch_h)))
 
-        # Horizontal lines.
         for row in range(source.rows + 1):
             y = int(off_y + row * pitch_h)
             if 0 <= y <= draw_h:
                 painter.drawLine(int(off_x), y, int(min(draw_w, off_x + source.cols * pitch_w)), y)
-
-        painter.end()
-        return overlay
 
     def _add_source_dialog(self):
         paths, _ = QFileDialog.getOpenFileNames(self, '打开源图片', '', 'PNG图片 (*.png)')
