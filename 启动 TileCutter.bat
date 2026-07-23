@@ -2,12 +2,17 @@
 setlocal
 
 cd /d "%~dp0"
-python main.py
+python -u main.py
+set "EXIT_CODE=%ERRORLEVEL%"
 
-if errorlevel 1 (
+if not "%EXIT_CODE%"=="0" (
     echo.
-    echo TileCutter 启动失败，请确认 Python 与依赖已安装。
-    pause
+    echo TileCutter failed to start. Check the error message above.
+) else (
+    echo.
+    echo TileCutter has exited.
 )
 
+echo Exit code: %EXIT_CODE%
+pause
 endlocal
