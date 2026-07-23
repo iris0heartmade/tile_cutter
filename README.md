@@ -1,29 +1,45 @@
 # TileCutter
 
-A desktop tileset editor for Godot, built with Python and PyQt5.
+一个用于 Godot 的桌面瓦片集编辑器，使用 Python 和 PyQt5 构建。
 
-## Features
+## 功能特性
 
-- Import multiple source tileset images.
-- Grid-based tile selection and copy/paste.
-- Pixel-level editing: brush, eraser, eyedropper.
-- Rectangle and magic-wand selection.
-- Color-to-transparent background removal.
-- Undo/redo.
-- Export PNG + Godot 4 TileSet `.tres` resource.
+- 导入多个源瓦片集图像
+- 基于网格的瓦片选择和复制/粘贴
+- 像素级编辑：画笔、橡皮擦、吸管
+- 矩形选择和魔棒选择
+- 颜色转透明背景移除
+- 撤销/重做
+- 导出 PNG + Godot 4 TileSet `.tres` 资源
 
-## Run
+## 运行
 
 ```bash
 python main.py
 ```
 
-## Test
+## 测试
 
 ```bash
 pytest tests/ -v
 ```
 
-## Project Structure
+## 项目结构
 
-See `docs/superpowers/specs/2026-07-22-tilecutter-design.md`.
+详见 `docs/superpowers/specs/2026-07-22-tilecutter-design.md`。
+
+## 使用说明
+
+1. **打开源图片**：点击左侧"添加源图"按钮或通过菜单"文件 > 打开源图"导入 PNG 图片
+2. **设置瓦片大小**：在左下角调整"瓦片宽"和"瓦片高"（默认为 48x48）
+3. **选择瓦片**：在左侧源图区域拖动选择瓦片
+4. **复制选区**：点击"复制选区"按钮或使用快捷键 Ctrl+C
+5. **粘贴瓦片**：在右侧画布区域点击粘贴
+6. **编辑工具**：使用顶部工具栏的画笔、橡皮擦、吸管等工具进行像素级编辑
+7. **导出**：通过菜单"文件 > 导出"导出 PNG 和 Godot `.tres` 文件
+
+## 配置
+
+- 默认瓦片大小：48x48 像素
+- 默认缩放：左侧源图区 4x，右侧画布区 4x
+- 布局比例：左侧源图区 1/3，右侧生成区 2/3

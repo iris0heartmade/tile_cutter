@@ -33,9 +33,9 @@ class MainWindow(QMainWindow):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setWindowTitle('TileCutter')
-        self.resize(1200, 800)
+        self.resize(1400, 1000)
 
-        self.project = ProjectModel(16, 16, 8, 8)
+        self.project = ProjectModel(48, 48, 8, 8)
         self.command_stack = CommandStack()
 
         # Set True whenever an undoable change is made; drives the
@@ -43,12 +43,12 @@ class MainWindow(QMainWindow):
         self.dirty = False
 
         self.tools = {
-            'Brush': BrushTool(),
-            'Eraser': EraserTool(),
-            'Eyedropper': EyedropperTool(),
-            'Rect Select': RectSelectTool(),
-            'Magic Wand': MagicWandTool(tolerance=30),
-            'Color to Transparent': ColorToTransparentTool(tolerance=30),
+            '画笔': BrushTool(),
+            '橡皮擦': EraserTool(),
+            '吸管': EyedropperTool(),
+            '矩形选择': RectSelectTool(),
+            '魔棒': MagicWandTool(tolerance=30),
+            '颜色转透明': ColorToTransparentTool(tolerance=30),
         }
 
         self._setup_widgets()
@@ -57,8 +57,8 @@ class MainWindow(QMainWindow):
         self._connect_signals()
 
         # Default tool.
-        self._set_tool(self.tools['Brush'], 'Brush')
-        self.tool_actions['Brush'].setChecked(True)
+        self._set_tool(self.tools['画笔'], '画笔')
+        self.tool_actions['画笔'].setChecked(True)
         self.status_bar.set_zoom(self.canvas.zoom())
         self.status_bar.set_canvas_size(self.project.cols, self.project.rows)
 
@@ -83,9 +83,9 @@ class MainWindow(QMainWindow):
         self.canvas_scroll.setWidget(self.canvas)
         self.canvas_scroll.setWidgetResizable(False)
         splitter.addWidget(self.canvas_scroll)
-        splitter.setStretchFactor(0, 0)
-        splitter.setStretchFactor(1, 1)
-        splitter.setSizes([260, 940])
+        splitter.setStretchFactor(0, 1)
+        splitter.setStretchFactor(1, 2)
+        splitter.setSizes([467, 933])
 
         layout.addWidget(splitter, 1)
         self.setCentralWidget(central)
@@ -93,42 +93,42 @@ class MainWindow(QMainWindow):
     def _setup_menu(self):
         menu_bar = self.menuBar()
 
-        file_menu = menu_bar.addMenu('&File')
-        new_action = QAction('&New', self)
+        file_menu = menu_bar.addMenu('&文件')
+        new_action = QAction('&新建', self)
         new_action.setShortcut(QKeySequence.New)
         new_action.triggered.connect(self._on_new)
         file_menu.addAction(new_action)
 
-        open_action = QAction('&Open Source...', self)
+        open_action = QAction('&打开源图...', self)
         open_action.setShortcut(QKeySequence.Open)
         open_action.triggered.connect(self._on_open_source)
         file_menu.addAction(open_action)
 
-        export_action = QAction('&Export...', self)
+        export_action = QAction('&导出...', self)
         export_action.setShortcut(QKeySequence('Ctrl+E'))
         export_action.triggered.connect(self._on_export)
         file_menu.addAction(export_action)
 
-        edit_menu = menu_bar.addMenu('&Edit')
-        self.undo_action = QAction('&Undo', self)
+        edit_menu = menu_bar.addMenu('&编辑')
+        self.undo_action = QAction('&撤销', self)
         self.undo_action.setShortcut(QKeySequence.Undo)
         self.undo_action.setEnabled(False)
         self.undo_action.triggered.connect(self._on_undo)
         edit_menu.addAction(self.undo_action)
 
-        self.redo_action = QAction('&Redo', self)
+        self.redo_action = QAction('&重做', self)
         self.redo_action.setShortcut(QKeySequence.Redo)
         self.redo_action.setEnabled(False)
         self.redo_action.triggered.connect(self._on_redo)
         edit_menu.addAction(self.redo_action)
 
-        clear_action = QAction('&Clear Selection', self)
+        clear_action = QAction('&清除选区', self)
         clear_action.setShortcut(QKeySequence.Delete)
         clear_action.triggered.connect(self._on_clear_selection)
         edit_menu.addAction(clear_action)
 
     def _setup_toolbar(self):
-        toolbar = QToolBar('Tools', self)
+        toolbar = QToolBar('工具', self)
         toolbar.setMovable(False)
         self.addToolBar(toolbar)
 
@@ -146,26 +146,35 @@ class MainWindow(QMainWindow):
 
         toolbar.addSeparator()
 
-        zoom_in = QAction('Zoom +', self)
+        zoom_in = QAction('放大 +', self)
         zoom_in.setShortcut(QKeySequence.ZoomIn)
         zoom_in.triggered.connect(lambda: self._change_zoom(2.0))
         toolbar.addAction(zoom_in)
 
-        zoom_out = QAction('Zoom -', self)
+        zoom_out = QAction('缩小 -', self)
         zoom_out.setShortcut(QKeySequence.ZoomOut)
         zoom_out.triggered.connect(lambda: self._change_zoom(0.5))
         toolbar.addAction(zoom_out)
 
+        toolbar.addWidget(QLabel(' 缩放: '))
+        self.zoom_spin = QSpinBox()
+        self.zoom_spin.setRange(25, 800)
+        self.zoom_spin.setSingleStep(25)
+        self.zoom_spin.setSuffix('%')
+        self.zoom_spin.setValue(int(self.canvas.zoom() * 100))
+        self.zoom_spin.valueChanged.connect(self._on_zoom_spin_changed)
+        toolbar.addWidget(self.zoom_spin)
+
         toolbar.addSeparator()
 
-        toolbar.addWidget(QLabel(' Cols: '))
+        toolbar.addWidget(QLabel(' 列数: '))
         self.cols_spin = QSpinBox()
         self.cols_spin.setRange(1, 256)
         self.cols_spin.setValue(self.project.cols)
         self.cols_spin.valueChanged.connect(self._on_canvas_size_changed)
         toolbar.addWidget(self.cols_spin)
 
-        toolbar.addWidget(QLabel(' Rows: '))
+        toolbar.addWidget(QLabel(' 行数: '))
         self.rows_spin = QSpinBox()
         self.rows_spin.setRange(1, 256)
         self.rows_spin.setValue(self.project.rows)
@@ -174,6 +183,7 @@ class MainWindow(QMainWindow):
 
     def _connect_signals(self):
         self.source_library.tile_copied.connect(self.canvas.set_paste_image)
+        self.source_library.tile_size_changed.connect(self._on_tile_size_changed)
         self.canvas.mouse_moved.connect(self._on_canvas_mouse_moved)
         self.command_stack.can_undo_changed.connect(self.undo_action.setEnabled)
         self.command_stack.can_redo_changed.connect(self.redo_action.setEnabled)
@@ -191,8 +201,20 @@ class MainWindow(QMainWindow):
         self.status_bar.showMessage(f'Tool: {name}', 2000)
 
     def _change_zoom(self, factor: float):
-        self.canvas.set_zoom(self.canvas.zoom() * factor)
+        new_zoom = self.canvas.zoom() * factor
+        self._apply_zoom(new_zoom)
+
+    def _on_zoom_spin_changed(self, value: int):
+        new_zoom = value / 100.0
+        self._apply_zoom(new_zoom)
+
+    def _apply_zoom(self, zoom: float):
+        self.canvas.set_zoom(zoom)
         self.status_bar.set_zoom(self.canvas.zoom())
+        # Sync the spinbox without re-triggering valueChanged.
+        self.zoom_spin.blockSignals(True)
+        self.zoom_spin.setValue(int(self.canvas.zoom() * 100))
+        self.zoom_spin.blockSignals(False)
 
     # --- Canvas size --------------------------------------------------------
 
@@ -222,6 +244,10 @@ class MainWindow(QMainWindow):
         self.canvas.resize(self.canvas.sizeHint())
         self.canvas.update()
 
+    def _on_tile_size_changed(self, tile_w: int, tile_h: int):
+        self.project.set_tile_size(tile_w, tile_h)
+        self._refresh_canvas()
+
     # --- Undo / redo --------------------------------------------------------
 
     def _on_undo(self):
@@ -237,7 +263,7 @@ class MainWindow(QMainWindow):
     # --- File actions -------------------------------------------------------
 
     def _on_new(self):
-        self.project = ProjectModel(16, 16, 8, 8)
+        self.project = ProjectModel(48, 48, 8, 8)
         self.canvas.project = self.project
         self.source_library.project = self.project
         # Fresh undo history for the fresh project.
@@ -255,7 +281,7 @@ class MainWindow(QMainWindow):
 
     def _on_open_source(self):
         paths, _ = QFileDialog.getOpenFileNames(
-            self, 'Open Source Image', '', 'PNG Images (*.png)')
+            self, '打开源图片', '', 'PNG图片 (*.png)')
         if not paths:
             return
         for path in paths:
@@ -264,7 +290,7 @@ class MainWindow(QMainWindow):
                                      self.project.tile_width,
                                      self.project.tile_height)
             except (FileNotFoundError, ValueError) as exc:
-                QMessageBox.warning(self, 'Open Source Failed', str(exc))
+                QMessageBox.warning(self, '打开失败', str(exc))
                 continue
             self.source_library.add_source(source)
         # Loading a fresh source library is treated as a clean state.
@@ -272,7 +298,7 @@ class MainWindow(QMainWindow):
 
     def _on_export(self):
         path_str, _ = QFileDialog.getSaveFileName(
-            self, 'Export Tileset', '', 'PNG Images (*.png)')
+            self, '导出瓦片集', '', 'PNG图片 (*.png)')
         if not path_str:
             return
         png_path = Path(path_str)
@@ -280,25 +306,22 @@ class MainWindow(QMainWindow):
             png_path = png_path.with_suffix('.png')
         tres_path = png_path.with_suffix('.tres')
 
-        # Godot resource path is user-configurable; default to the PNG name at
-        # the project root. Cancelling the prompt keeps the default.
         default_res = f'res://{png_path.name}'
         res_path, accepted = QInputDialog.getText(
-            self, 'Godot Resource Path',
-            'Texture path inside the Godot project:', text=default_res)
+            self, 'Godot资源路径',
+            'Godot项目中的纹理路径:', text=default_res)
         godot_texture_path = res_path if (accepted and res_path) else default_res
 
         try:
             GodotExporter.export(self.project, png_path, tres_path,
                                  godot_texture_path)
         except OSError as exc:
-            QMessageBox.critical(self, 'Export Failed', str(exc))
+            QMessageBox.critical(self, '导出失败', str(exc))
             return
-        # A successful export persists the project -> no longer dirty.
         self.dirty = False
         QMessageBox.information(
-            self, 'Export Complete',
-            f'Exported:\n{png_path}\n{tres_path}')
+            self, '导出完成',
+            f'已导出:\n{png_path}\n{tres_path}')
 
     # --- Close handling -----------------------------------------------------
 
@@ -308,8 +331,8 @@ class MainWindow(QMainWindow):
             event.accept()
             return
         reply = QMessageBox.question(
-            self, 'Unsaved Changes',
-            'You have unsaved changes. Save before closing?',
+            self, '未保存的更改',
+            '您有未保存的更改。关闭前保存？',
             QMessageBox.Yes | QMessageBox.No | QMessageBox.Cancel,
             QMessageBox.Yes)
         if reply == QMessageBox.Yes:

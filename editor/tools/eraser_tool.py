@@ -5,7 +5,7 @@ from editor.tools.brush_tool import BrushTool
 class EraserTool(BrushTool):
     """BrushTool that makes pixels transparent instead of painting color."""
 
-    name = 'Eraser'
+    name = '橡皮擦'
 
     def __init__(self, size: int = 1, opacity: int = 255):
         # Eraser has no color; pass a fully-transparent default to BrushTool.

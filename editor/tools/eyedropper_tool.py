@@ -5,7 +5,7 @@ from editor.tools.base_tool import Tool
 class EyedropperTool(Tool):
     """Click picks the canvas pixel color into `self.picked_color`."""
 
-    name = 'Eyedropper'
+    name = '吸管'
 
     def __init__(self):
         self.picked_color = None

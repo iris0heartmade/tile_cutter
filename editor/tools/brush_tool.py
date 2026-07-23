@@ -7,7 +7,7 @@ from editor.commands.draw_command import DrawCommand
 class BrushTool(Tool):
     """Square brush kernel of side `size`. Drags produce a single undoable stroke."""
 
-    name = 'Brush'
+    name = '画笔'
 
     def __init__(self, color: QColor = None, size: int = 1, opacity: int = 255,
                  hardness: int = 100):

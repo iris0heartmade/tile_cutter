@@ -16,7 +16,7 @@ class CanvasWidget(QWidget):
         super().__init__(parent)
         self.project = project
         self.command_stack = command_stack
-        self._zoom = 1.0
+        self._zoom = 4.0
         self._tool = None
         # Paste preview state. When `_paste_image` is not None the widget
         # is in "place paste" mode: it draws a half-opacity preview that
@@ -74,6 +74,8 @@ class CanvasWidget(QWidget):
     def paintEvent(self, event):
         painter = QPainter(self)
         painter.setRenderHint(QPainter.SmoothPixmapTransform, False)
+
+        painter.fillRect(self.rect(), QColor(30, 30, 30))
 
         scaled = self.project.image.scaled(
             int(self.project.width * self._zoom),

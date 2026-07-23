@@ -28,6 +28,23 @@ class ProjectModel:
     def clear_selection(self):
         self.selection = set()
 
+    def set_tile_size(self, tile_width: int, tile_height: int):
+        old_w, old_h = self.width, self.height
+        self.tile_width = int(tile_width)
+        self.tile_height = int(tile_height)
+        new_w, new_h = self._calculate_size(self.cols, self.rows)
+        if new_w != old_w or new_h != old_h:
+            new_image = QImage(new_w, new_h, QImage.Format_ARGB32)
+            new_image.fill(qRgba(0, 0, 0, 0))
+            painter = QPainter(new_image)
+            painter.drawImage(0, 0, self.image)
+            painter.end()
+            self.image = new_image
+            self.selection = {
+                (x, y) for (x, y) in self.selection
+                if 0 <= x < new_w and 0 <= y < new_h
+            }
+
     def _calculate_size(self, cols: int, rows: int) -> Tuple[int, int]:
         w = self.offset_x + cols * self.tile_width
         if cols > 1:

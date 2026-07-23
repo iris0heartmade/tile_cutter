@@ -6,7 +6,7 @@ from editor.tools.base_tool import Tool
 class RectSelectTool(Tool):
     """Drag to create a rectangular pixel selection on the canvas."""
 
-    name = 'Rectangle Select'
+    name = '矩形选择'
 
     def __init__(self):
         self._start = None

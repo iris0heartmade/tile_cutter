@@ -12,7 +12,7 @@ class ColorToTransparentTool(Tool):
     otherwise scans the whole canvas.
     """
 
-    name = 'Color to Transparent'
+    name = '颜色转透明'
 
     def __init__(self, color: QColor = None, tolerance: int = 0):
         self.color = color if color is not None else QColor(127, 127, 127)

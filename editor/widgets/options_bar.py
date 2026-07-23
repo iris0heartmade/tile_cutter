@@ -18,7 +18,7 @@ class OptionsBar(QWidget):
         super().__init__(parent)
         self._layout = QHBoxLayout(self)
         self._layout.setContentsMargins(6, 2, 6, 2)
-        self.tool_label = QLabel('Tool: -')
+        self.tool_label = QLabel('工具: -')
         self._layout.addWidget(self.tool_label)
         self._layout.addStretch(1)
         self._tool = None
@@ -28,9 +28,9 @@ class OptionsBar(QWidget):
         self._tool = tool
         self._clear_options()
         if tool is None:
-            self.tool_label.setText('Tool: -')
+            self.tool_label.setText('工具: -')
             return
-        self.tool_label.setText(f'Tool: {tool.name}')
+        self.tool_label.setText(f'工具: {tool.name}')
         for key, value in tool.get_options().items():
             self._add_option(tool, key, value)
 
@@ -45,8 +45,18 @@ class OptionsBar(QWidget):
         self._layout.insertWidget(self._layout.count() - 1, widget)
         self._option_widgets.append(widget)
 
+    _option_labels = {
+        'color': '颜色',
+        'size': '大小',
+        'opacity': '透明度',
+        'hardness': '硬度',
+        'tolerance': '容差',
+        'contiguous': '连续',
+    }
+
     def _add_option(self, tool, key: str, value):
-        label = QLabel(f'{key.capitalize()}:')
+        label_text = self._option_labels.get(key, key.capitalize())
+        label = QLabel(f'{label_text}:')
         self._add_widget(label)
         if isinstance(value, bool):
             box = QCheckBox()
@@ -66,11 +76,12 @@ class OptionsBar(QWidget):
             btn.clicked.connect(lambda _, k=key, b=btn: self._pick_color(tool, k, b))
             self._add_widget(btn)
         else:
-            label.setText(f'{key.capitalize()}: {value}')
+            label.setText(f'{label_text}: {value}')
 
     def _pick_color(self, tool, key: str, button: QPushButton):
         current = getattr(tool, key)
-        color = QColorDialog.getColor(current, self, f'Pick {key}')
+        label_text = self._option_labels.get(key, key)
+        color = QColorDialog.getColor(current, self, f'选择{label_text}')
         if color.isValid():
             setattr(tool, key, color)
             button.setStyleSheet(f'background-color: {color.name()};')

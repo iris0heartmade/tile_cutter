@@ -45,3 +45,15 @@ class SourceImage:
         x = self.offset_x + col * (self.tile_width + self.gutter_x)
         y = self.offset_y + row * (self.tile_height + self.gutter_y)
         return QRect(x, y, self.tile_width, self.tile_height)
+
+    def set_tile_size(self, tile_width: int, tile_height: int):
+        self.tile_width = int(tile_width)
+        self.tile_height = int(tile_height)
+        available_w = self.image.width() - self.offset_x
+        available_h = self.image.height() - self.offset_y
+        if available_w <= 0 or available_h <= 0:
+            self._cols = 0
+            self._rows = 0
+        else:
+            self._cols = max(0, (available_w + self.gutter_x) // (self.tile_width + self.gutter_x))
+            self._rows = max(0, (available_h + self.gutter_y) // (self.tile_height + self.gutter_y))

@@ -6,7 +6,7 @@ from editor.tools.base_tool import Tool
 class MagicWandTool(Tool):
     """Click to select pixels matching a target color within a tolerance."""
 
-    name = 'Magic Wand'
+    name = '魔棒'
 
     def __init__(self, tolerance: int = 0, contiguous: bool = True):
         self.tolerance = max(0, min(255, int(tolerance)))

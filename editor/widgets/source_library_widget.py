@@ -1,9 +1,9 @@
 from PyQt5.QtCore import Qt, pyqtSignal
 from PyQt5.QtGui import QImage, QPixmap, QPainter, QColor, QPen
 from PyQt5.QtWidgets import (
-    QWidget, QVBoxLayout, QPushButton, QListWidget,
+    QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QListWidget,
     QListWidgetItem, QLabel, QFileDialog, QSpinBox, QFormLayout,
-    QMessageBox,
+    QMessageBox, QScrollArea, QDoubleSpinBox,
 )
 from editor.models.project_model import ProjectModel
 from editor.models.source_image import SourceImage
@@ -12,9 +12,8 @@ from editor.models.source_image import SourceImage
 class TilePreviewLabel(QLabel):
     """A QLabel that delegates mouse events to its parent SourceLibraryWidget.
 
-    The label handles its own paint of the source image (scaled with
-    KeepAspectRatio). The parent widget owns the selection state
-    (`_select_start`, `_select_end`) and the math that maps widget-space
+    The label shows the source image at a user-controlled zoom level.
+    The parent widget owns the selection state and maps widget-space
     mouse coordinates back to image-space tile coordinates.
     """
 
@@ -35,6 +34,7 @@ class TilePreviewLabel(QLabel):
 
 class SourceLibraryWidget(QWidget):
     tile_copied = pyqtSignal(QImage)
+    tile_size_changed = pyqtSignal(int, int)
 
     def __init__(self, project: ProjectModel, parent=None):
         super().__init__(parent)
@@ -44,6 +44,7 @@ class SourceLibraryWidget(QWidget):
         self._select_start = None  # (col, row) or None
         self._select_end = None    # (col, row) or None
         self._current_source_index = -1
+        self._zoom = 4.0
         self._setup_ui()
 
     def _setup_ui(self):
@@ -53,18 +54,33 @@ class SourceLibraryWidget(QWidget):
         self.source_list.currentRowChanged.connect(self._on_source_changed)
         layout.addWidget(self.source_list)
 
-        self.add_btn = QPushButton('Add Source')
+        self.add_btn = QPushButton('添加源图')
         self.add_btn.clicked.connect(self._add_source_dialog)
         layout.addWidget(self.add_btn)
 
-        self.copy_btn = QPushButton('Copy Selection')
+        zoom_layout = QHBoxLayout()
+        zoom_layout.addWidget(QLabel('缩放:'))
+        self.zoom_spin = QDoubleSpinBox()
+        self.zoom_spin.setRange(0.25, 8.0)
+        self.zoom_spin.setSingleStep(0.25)
+        self.zoom_spin.setValue(self._zoom)
+        self.zoom_spin.setSuffix('x')
+        self.zoom_spin.valueChanged.connect(self._on_zoom_changed)
+        zoom_layout.addWidget(self.zoom_spin)
+        layout.addLayout(zoom_layout)
+
+        self.copy_btn = QPushButton('复制选区')
+        self.copy_btn.setShortcut('Ctrl+C')
         self.copy_btn.clicked.connect(self.copy_selection)
         layout.addWidget(self.copy_btn)
 
+        # Preview area: scrollable so large source images can be viewed
+        # at 1:1 or higher zoom.
+        self.preview_scroll = QScrollArea()
+        self.preview_scroll.setWidgetResizable(False)
         self.preview_label = TilePreviewLabel(self)
-        self.preview_label.setAlignment(Qt.AlignCenter)
-        self.preview_label.setMinimumHeight(200)
-        layout.addWidget(self.preview_label, 1)
+        self.preview_scroll.setWidget(self.preview_label)
+        layout.addWidget(self.preview_scroll, 1)
 
         # Grid config for source (mirrors project grid by default).
         form = QFormLayout()
@@ -74,11 +90,28 @@ class SourceLibraryWidget(QWidget):
         self.src_tile_h = QSpinBox()
         self.src_tile_h.setRange(1, 512)
         self.src_tile_h.setValue(self.project.tile_height)
-        form.addRow('Tile W:', self.src_tile_w)
-        form.addRow('Tile H:', self.src_tile_h)
+        form.addRow('瓦片宽:', self.src_tile_w)
+        form.addRow('瓦片高:', self.src_tile_h)
         layout.addLayout(form)
 
+        self.src_tile_w.valueChanged.connect(self._on_tile_size_changed)
+        self.src_tile_h.valueChanged.connect(self._on_tile_size_changed)
+
         self.setLayout(layout)
+
+    def _on_zoom_changed(self, value: float):
+        self._zoom = max(0.25, min(8.0, float(value)))
+        self._update_preview()
+
+    def _on_tile_size_changed(self, _):
+        tile_w = self.src_tile_w.value()
+        tile_h = self.src_tile_h.value()
+        for source in self.sources:
+            source.set_tile_size(tile_w, tile_h)
+        self._select_start = None
+        self._select_end = None
+        self._update_preview()
+        self.tile_size_changed.emit(tile_w, tile_h)
 
     def add_source(self, source: SourceImage):
         self.sources.append(source)
@@ -102,41 +135,83 @@ class SourceLibraryWidget(QWidget):
         if self._current_source_index < 0 or self._current_source_index >= len(self.sources):
             return
         source = self.sources[self._current_source_index]
-        label_size = self.preview_label.size()
-        # Guard against a zero-sized label during initial layout.
-        if label_size.width() <= 0 or label_size.height() <= 0:
+        img_w = source.image.width()
+        img_h = source.image.height()
+        if img_w <= 0 or img_h <= 0:
             return
+
+        # Scale the image by the user-controlled zoom factor.
+        draw_w = int(img_w * self._zoom)
+        draw_h = int(img_h * self._zoom)
         pixmap = QPixmap.fromImage(source.image).scaled(
-            label_size.width(), label_size.height(),
-            Qt.KeepAspectRatio, Qt.SmoothTransformation)
+            draw_w, draw_h,
+            Qt.IgnoreAspectRatio, Qt.FastTransformation)
+
         # Overlay the selection rectangle on top of the scaled image.
         if self._select_start is not None and self._select_end is not None:
             overlay = QPixmap(pixmap)
             painter = QPainter(overlay)
             pen = QPen(QColor(0, 150, 255, 230))
-            pen.setWidth(2)
+            pen.setWidth(max(1, int(self._zoom * 2)))
             painter.setPen(pen)
             min_col, max_col, min_row, max_row = self._normalized_selection()
-            img_w = source.image.width()
-            img_h = source.image.height()
-            scale = min(label_size.width() / img_w, label_size.height() / img_h)
-            draw_w = img_w * scale
-            draw_h = img_h * scale
-            offset_x = (label_size.width() - draw_w) / 2
-            offset_y = (label_size.height() - draw_h) / 2
-            tile_pitch_w = source.tile_width * scale
-            tile_pitch_h = source.tile_height * scale
-            x = offset_x + min_col * tile_pitch_w
-            y = offset_y + min_row * tile_pitch_h
-            w = (max_col - min_col + 1) * tile_pitch_w
-            h = (max_row - min_row + 1) * tile_pitch_h
+
+            pitch_w = (source.tile_width + source.gutter_x) * self._zoom
+            pitch_h = (source.tile_height + source.gutter_y) * self._zoom
+            off_x = source.offset_x * self._zoom
+            off_y = source.offset_y * self._zoom
+
+            x = off_x + min_col * pitch_w
+            y = off_y + min_row * pitch_h
+            w = (max_col - min_col + 1) * pitch_w - source.gutter_x * self._zoom
+            h = (max_row - min_row + 1) * pitch_h - source.gutter_y * self._zoom
             painter.drawRect(int(x), int(y), int(w), int(h))
             painter.end()
             pixmap = overlay
+
+        # Draw grid overlay (tile boundaries) on top of everything.
+        pixmap = self._draw_grid_on_pixmap(pixmap, source)
+
+        self.preview_label.setFixedSize(draw_w, draw_h)
         self.preview_label.setPixmap(pixmap)
 
+    def _draw_grid_on_pixmap(self, pixmap: QPixmap, source: SourceImage) -> QPixmap:
+        """Draw tile grid lines on top of the given pixmap.
+
+        Returns a new pixmap with grid overlay so the original is not
+        modified in-place.
+        """
+        overlay = QPixmap(pixmap)
+        painter = QPainter(overlay)
+        pen = QPen(QColor(100, 200, 255, 120))
+        pen.setWidth(max(1, int(self._zoom)))
+        painter.setPen(pen)
+
+        z = self._zoom
+        off_x = source.offset_x * z
+        off_y = source.offset_y * z
+        pitch_w = (source.tile_width + source.gutter_x) * z
+        pitch_h = (source.tile_height + source.gutter_y) * z
+        draw_w = pixmap.width()
+        draw_h = pixmap.height()
+
+        # Vertical lines (tile boundaries, not gutter boundaries).
+        for col in range(source.cols + 1):
+            x = int(off_x + col * pitch_w)
+            if 0 <= x <= draw_w:
+                painter.drawLine(x, int(off_y), x, int(min(draw_h, off_y + source.rows * pitch_h)))
+
+        # Horizontal lines.
+        for row in range(source.rows + 1):
+            y = int(off_y + row * pitch_h)
+            if 0 <= y <= draw_h:
+                painter.drawLine(int(off_x), y, int(min(draw_w, off_x + source.cols * pitch_w)), y)
+
+        painter.end()
+        return overlay
+
     def _add_source_dialog(self):
-        paths, _ = QFileDialog.getOpenFileNames(self, 'Open Source Image', '', 'PNG Images (*.png)')
+        paths, _ = QFileDialog.getOpenFileNames(self, '打开源图片', '', 'PNG图片 (*.png)')
         if not paths:
             return
         for path in paths:
@@ -175,28 +250,46 @@ class SourceLibraryWidget(QWidget):
     def _event_to_tile(self, event):
         """Map a widget-space mouse event to (col, row) tile coords in the
         current source image. Returns None when the event is outside the
-        drawn image area.
+        drawn image area or falls inside a gutter.
         """
         if self._current_source_index < 0:
             return None
         source = self.sources[self._current_source_index]
-        label_size = self.preview_label.size()
         img_w = source.image.width()
         img_h = source.image.height()
-        if img_w <= 0 or img_h <= 0 or label_size.width() <= 0 or label_size.height() <= 0:
+        if img_w <= 0 or img_h <= 0:
             return None
-        # Same KeepAspectRatio math used by QPixmap.scaled() above.
-        scale = min(label_size.width() / img_w, label_size.height() / img_h)
-        draw_w = img_w * scale
-        draw_h = img_h * scale
-        offset_x = (label_size.width() - draw_w) / 2
-        offset_y = (label_size.height() - draw_h) / 2
-        ix = (event.x() - offset_x) / scale
-        iy = (event.y() - offset_y) / scale
+
+        # Mouse coords are directly in scaled image space because the label
+        # size matches the scaled image exactly.
+        ix = event.x() / self._zoom
+        iy = event.y() / self._zoom
         if ix < 0 or iy < 0 or ix >= img_w or iy >= img_h:
             return None
-        col = int(ix) // source.tile_width
-        row = int(iy) // source.tile_height
+
+        # Respect source offset: pixels before offset_x/offset_y are not part
+        # of any tile.
+        if ix < source.offset_x or iy < source.offset_y:
+            return None
+
+        # Compute position relative to the first tile origin.
+        rel_x = ix - source.offset_x
+        rel_y = iy - source.offset_y
+
+        pitch_x = source.tile_width + source.gutter_x
+        pitch_y = source.tile_height + source.gutter_y
+        if pitch_x <= 0 or pitch_y <= 0:
+            return None
+
+        col = int(rel_x) // pitch_x
+        row = int(rel_y) // pitch_y
+
+        # Reject clicks that fall inside a gutter (not on actual tile pixels).
+        within_col = int(rel_x) % pitch_x
+        within_row = int(rel_y) % pitch_y
+        if within_col >= source.tile_width or within_row >= source.tile_height:
+            return None
+
         if 0 <= col < source.cols and 0 <= row < source.rows:
             return col, row
         return None
@@ -225,11 +318,10 @@ class SourceLibraryWidget(QWidget):
                 or source.tile_height != self.project.tile_height):
             QMessageBox.warning(
                 self,
-                'Grid Mismatch',
-                f'Source grid {source.tile_width}x{source.tile_height} does not '
-                f'match target grid '
-                f'{self.project.tile_width}x{self.project.tile_height}. '
-                f'Copy aborted.',
+                '网格不匹配',
+                f'源图网格 {source.tile_width}x{source.tile_height} 与目标网格 '
+                f'{self.project.tile_width}x{self.project.tile_height} 不匹配。'
+                f'复制已取消。',
             )
             return
 

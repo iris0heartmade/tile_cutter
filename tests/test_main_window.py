@@ -59,10 +59,10 @@ def test_canvas_mouse_moved_updates_status(app):
 
 def test_set_tool_updates_canvas_and_options(app):
     window = MainWindow()
-    tool = window.tools['Eraser']
-    window._set_tool(tool, 'Eraser')
+    tool = window.tools['橡皮擦']
+    window._set_tool(tool, '橡皮擦')
     assert window.canvas._tool is tool
-    assert 'Eraser' in window.options_bar.tool_label.text()
+    assert '橡皮擦' in window.options_bar.tool_label.text()
 
 
 def test_export_prompts_for_godot_path(app, tmp_path, monkeypatch):
