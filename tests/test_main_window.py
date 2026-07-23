@@ -31,7 +31,15 @@ def test_main_window_creates_widgets(app):
     assert window.status_bar is not None
 
 
-def test_spinbox_resize_pushes_command(app):
+
+
+def test_default_layout_matches_reference_screenshot(app):
+    window = MainWindow()
+    assert window.size().width() == 2200
+    assert window.size().height() == 1266
+    assert window.main_splitter.count() == 2
+    assert all(size > 0 for size in window.main_splitter.sizes())
+    assert window.source_library.minimumWidth() >= 700
     window = MainWindow()
     old_cols = window.project.cols
     window.cols_spin.setValue(old_cols + 2)

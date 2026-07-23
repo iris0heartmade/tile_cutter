@@ -33,7 +33,7 @@ class MainWindow(QMainWindow):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setWindowTitle('TileCutter')
-        self.resize(1400, 1000)
+        self.resize(2200, 1266)
 
         self.project = ProjectModel(48, 48, 8, 8)
         self.command_stack = CommandStack()
@@ -76,18 +76,20 @@ class MainWindow(QMainWindow):
         layout.setContentsMargins(0, 0, 0, 0)
         layout.addWidget(self.options_bar)
 
-        splitter = QSplitter(Qt.Horizontal)
-        splitter.addWidget(self.source_library)
+        self.main_splitter = QSplitter(Qt.Horizontal)
+        self.main_splitter.addWidget(self.source_library)
 
         self.canvas_scroll = QScrollArea()
         self.canvas_scroll.setWidget(self.canvas)
         self.canvas_scroll.setWidgetResizable(False)
-        splitter.addWidget(self.canvas_scroll)
-        splitter.setStretchFactor(0, 1)
-        splitter.setStretchFactor(1, 2)
-        splitter.setSizes([467, 933])
+        self.main_splitter.addWidget(self.canvas_scroll)
+        self.main_splitter.setStretchFactor(0, 1)
+        self.main_splitter.setStretchFactor(1, 1)
+        self.main_splitter.setSizes([800, 1400])
+        self.source_library.setMinimumWidth(700)
+        self.canvas_scroll.setMinimumWidth(700)
 
-        layout.addWidget(splitter, 1)
+        layout.addWidget(self.main_splitter, 1)
         self.setCentralWidget(central)
 
     def _setup_menu(self):
